@@ -1,26 +1,389 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════
+   RecallIQ Design System — Green accent, dual theme
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Dark theme (default) ── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  /* Backgrounds */
+  --bg-base:        #080f0a;
+  --bg-subtle:      #0d1610;
+  --bg-surface:     rgba(13, 22, 16, 0.88);
+  --bg-elevated:    rgba(18, 30, 22, 0.92);
+  --bg-overlay:     rgba(8, 15, 10, 0.96);
+
+  /* Borders */
+  --border-default: rgba(74, 222, 128, 0.12);
+  --border-subtle:  rgba(74, 222, 128, 0.07);
+  --border-strong:  rgba(74, 222, 128, 0.22);
+
+  /* Text */
+  --text-primary:   #ecfdf5;
+  --text-secondary: #a7f3d0;
+  --text-muted:     #ffffff;
+  --text-faint:     #374151;
+
+  /* Green accent palette */
+  --green-50:  #f0fdf4;
+  --green-100: #dcfce7;
+  --green-200: #bbf7d0;
+  --green-300: #86efac;
+  --green-400: #4ade80;
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+
+  /* Emerald accent */
+  --emerald-400: #34d399;
+  --emerald-500: #10b981;
+
+  /* Status colors */
+  --success-bg:  rgba(34, 197, 94, 0.12);
+  --success-text: #86efac;
+  --success-border: rgba(74, 222, 128, 0.25);
+
+  --warning-bg:   rgba(251, 191, 36, 0.12);
+  --warning-text: #fde68a;
+  --warning-border: rgba(251, 191, 36, 0.25);
+
+  --danger-bg:    rgba(239, 68, 68, 0.12);
+  --danger-text:  #fca5a5;
+  --danger-border: rgba(239, 68, 68, 0.25);
+
+  --info-bg:      rgba(59, 130, 246, 0.10);
+  --info-text:    #93c5fd;
+  --info-border:  rgba(59, 130, 246, 0.20);
+
+  /* Shadows */
+  --shadow-card:  0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(74, 222, 128, 0.04);
+  --shadow-glow:  0 0 24px rgba(34, 197, 94, 0.18), 0 0 60px rgba(34, 197, 94, 0.06);
+
+  /* Dark-mode surface helpers */
+  --surface-item-bg:    rgba(34, 197, 94, 0.04);
+  --surface-item-border: rgba(74, 222, 128, 0.10);
+  --surface-overlay-bg: rgba(255, 255, 255, 0.03);
+  --surface-overlay-border: rgba(255, 255, 255, 0.08);
 }
 
+/* ── Light theme ── */
+.light {
+  color-scheme: light;
+
+  /* Backgrounds */
+  --bg-base:        #f0fdf4;
+  --bg-subtle:      #dcfce7;
+  --bg-surface:     rgba(255, 255, 255, 0.92);
+  --bg-elevated:    rgba(255, 255, 255, 0.98);
+  --bg-overlay:     rgba(240, 253, 244, 0.98);
+
+  /* Borders */
+  --border-default: rgba(22, 163, 74, 0.18);
+  --border-subtle:  rgba(22, 163, 74, 0.10);
+  --border-strong:  rgba(22, 163, 74, 0.30);
+
+  /* Text */
+  --text-primary:   #052e16;
+  --text-secondary: #166534;
+  --text-muted:     #374151;
+  --text-faint:     #9ca3af;
+
+  /* Status colors — same hues, adjusted for light bg */
+  --success-bg:    rgba(22, 163, 74, 0.10);
+  --success-text:  #15803d;
+  --success-border: rgba(22, 163, 74, 0.25);
+
+  --warning-bg:    rgba(202, 138, 4, 0.10);
+  --warning-text:  #92400e;
+  --warning-border: rgba(202, 138, 4, 0.25);
+
+  --danger-bg:     rgba(220, 38, 38, 0.08);
+  --danger-text:   #991b1b;
+  --danger-border: rgba(220, 38, 38, 0.20);
+
+  --info-bg:       rgba(37, 99, 235, 0.08);
+  --info-text:     #1e40af;
+  --info-border:   rgba(37, 99, 235, 0.18);
+
+  /* Shadows */
+  --shadow-card:  0 2px 12px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-glow:  0 0 20px rgba(22, 163, 74, 0.12);
+
+  /* Light-mode surface overrides — white-opacity patterns become gray-opacity */
+  --surface-item-bg:    rgba(22, 163, 74, 0.05);
+  --surface-item-border: rgba(22, 163, 74, 0.14);
+  --surface-overlay-bg: rgba(15, 23, 42, 0.04);
+  --surface-overlay-border: rgba(15, 23, 42, 0.10);
+}
+
+/* ── Tailwind theme bridge ── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; }
+* { border-color: var(--border-default); }
+
+/* ── Base HTML/Body ── */
+html {
+  min-height: 100%;
+  background: var(--bg-base);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dark body gradient */
+:root body {
+  background:
+    radial-gradient(ellipse 70% 40% at 20% 0%, rgba(34, 197, 94, 0.08), transparent),
+    radial-gradient(ellipse 50% 40% at 80% 90%, rgba(16, 185, 129, 0.06), transparent),
+    #080f0a;
+}
+
+/* Light body gradient */
+.light body {
+  background:
+    radial-gradient(ellipse 70% 40% at 20% 0%, rgba(34, 197, 94, 0.10), transparent),
+    radial-gradient(ellipse 50% 40% at 80% 90%, rgba(16, 185, 129, 0.06), transparent),
+    #f0fdf4;
+}
+
+/* Dot grid overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.15;
+  background-image: radial-gradient(circle, rgba(74, 222, 128, 0.6) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+}
+
+.light body::before {
+  opacity: 0.25;
+  background-image: radial-gradient(circle, rgba(22, 163, 74, 0.4) 1px, transparent 1px);
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(74, 222, 128, 0.25);
+  color: #052e16;
+}
+
+/* ── Links ── */
+a { color: inherit; text-decoration: none; }
+button, input, textarea, select { font: inherit; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.2); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(74, 222, 128, 0.35); }
+
+/* ═══════════════════════════════════════════════════════════
+   Semantic component classes
+   ═══════════════════════════════════════════════════════════ */
+
+/* Glass card — used by Card component */
+.glass-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-card);
+}
+
+/* Sidebar */
+.sidebar-bg {
+  background: var(--bg-overlay);
+  border-right: 1px solid var(--border-subtle);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* Topbar */
+.topbar-bg {
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border-subtle);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Dropdown */
+.dropdown-bg {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+}
+
+.light .dropdown-bg {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* Active nav item */
+.nav-active {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.08));
+  border-color: rgba(74, 222, 128, 0.25) !important;
+  box-shadow: 0 2px 16px rgba(34, 197, 94, 0.10);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #4ade80 0%, #34d399 50%, #6ee7b7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Semantic text classes */
+.text-primary   { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted     { color: var(--text-muted); }
+.text-faint     { color: var(--text-faint); }
+
+/* Semantic border classes */
+.border-default { border-color: var(--border-default); }
+.border-subtle  { border-color: var(--border-subtle); }
+.border-strong  { border-color: var(--border-strong); }
+
+/* Semantic bg classes */
+.bg-surface  { background: var(--bg-surface); }
+.bg-elevated { background: var(--bg-elevated); }
+.bg-subtle   { background: var(--bg-subtle); }
+
+/* Status badges */
+.badge-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+.badge-warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+}
+.badge-danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+.badge-info {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: var(--info-border);
+}
+.badge-default {
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--green-300);
+  border-color: rgba(74, 222, 128, 0.22);
+}
+.badge-secondary {
+  background: rgba(107, 114, 128, 0.12);
+  color: var(--text-muted);
+  border-color: rgba(107, 114, 128, 0.18);
+}
+.light .badge-secondary {
+  background: rgba(22, 163, 74, 0.08);
+  color: var(--text-muted);
+  border-color: rgba(22, 163, 74, 0.15);
+}
+.badge-outline {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border-default);
+}
+
+/* Row / item surfaces */
+.item-surface {
+  background: var(--surface-item-bg);
+  border: 1px solid var(--surface-item-border);
+  border-radius: 0.75rem;
+}
+
+/* Info callout */
+.callout-info {
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  border-radius: 0.75rem;
+}
+
+/* Glow */
+.glow-green {
+  box-shadow: var(--shadow-glow);
+}
+
+/* Status dot pulse */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(0.8); }
+}
+.status-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* Input / Textarea base */
+.input-base {
+  background: var(--surface-item-bg);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  border-radius: 0.75rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input-base::placeholder { color: var(--text-faint); }
+.input-base:focus {
+  outline: none;
+  border-color: rgba(74, 222, 128, 0.4);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12);
+}
+.light .input-base {
+  background: rgba(22, 163, 74, 0.04);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Light-mode overrides for components using white-opacity
+   utilities (bg-white/*, border-white/*, text-white, etc.)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Inline card surfaces that use bg-white/3, bg-white/5 etc. */
+.light .surface-card {
+  background: rgba(22, 163, 74, 0.05) !important;
+  border-color: rgba(22, 163, 74, 0.14) !important;
+}
+
+/* Text overrides for hardcoded Tailwind slate utilities */
+.light .text-slate-200 { color: #1e293b !important; }
+.light .text-slate-300 { color: #334155 !important; }
+.light .text-slate-400 { color: #475569 !important; }
+.light .text-slate-500 { color: #64748b !important; }
+.light .text-slate-600 { color: #94a3b8 !important; }
+
+/* text-white is invisible in light mode — make it primary */
+.light .text-white { color: var(--text-primary) !important; }
+
+/* White-opacity backgrounds — replace with green-tint surfaces */
+.light .bg-white\/3,
+.light .bg-white\/4,
+.light .bg-white\/5,
+.light .bg-white\/6,
+.light .bg-white\/8 {
+  background: rgba(22, 163, 74, 0.06) !important;
+}
+
+/* White-opacity borders — replace with green-tint borders */
+.light .border-white\/8,
+.light .border-white\/10,
+.light .border-white\/12,
+.light .border-white\/15 {
+  border-color: rgba(22, 163, 74, 0.15) !important;
 }
