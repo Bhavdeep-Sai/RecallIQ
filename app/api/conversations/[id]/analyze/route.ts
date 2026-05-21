@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db/client";
+import { getSupabaseAdmin } from "@/lib/db/client";
 import { conversations, customers, messages } from "@/lib/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { analyzeConversation } from "@/lib/services/sales-ai";
@@ -27,32 +27,43 @@ export async function POST(
       });
     }
 
-    const db = getDb();
+    const supabase = getSupabaseAdmin();
 
-    // Load conversation + messages
-    const [convRow] = await db.select()
-      .from(conversations)
-      .where(and(eq(conversations.id, id), isNull(conversations.deletedAt)))
+    // Load conversation
+    const { data: convRows, error: convError } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("id", id)
+      .is("deleted_at", null)
       .limit(1);
 
-    if (!convRow) {
-      return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
-    }
+    if (convError) throw new Error(convError.message);
+    const convRow = (convRows ?? [])[0];
+    if (!convRow) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
 
-    const [customerRow] = await db.select()
-      .from(customers)
-      .where(and(eq(customers.id, convRow.customerId), isNull(customers.deletedAt)))
+    const { data: customerRows, error: customerError } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("id", convRow.customer_id)
+      .is("deleted_at", null)
       .limit(1);
+    if (customerError) throw new Error(customerError.message);
 
-    const messageRows = await db.select()
-      .from(messages)
-      .where(and(eq(messages.conversationId, id), isNull(messages.deletedAt)))
-      .orderBy(desc(messages.occurredAt))
+    const customerRow = (customerRows ?? [])[0];
+
+    const { data: messageRows, error: messagesError } = await supabase
+      .from("messages")
+      .select("sender_type, content, occurred_at")
+      .eq("conversation_id", id)
+      .is("deleted_at", null)
+      .order("occurred_at", { ascending: false })
       .limit(50);
 
-    const conversationText = messageRows
+    if (messagesError) throw new Error(messagesError.message);
+
+    const conversationText = (messageRows ?? [])
       .reverse()
-      .map((m) => `[${m.senderType.toUpperCase()}]: ${m.content}`)
+      .map((m: any) => `[${(m.sender_type ?? m.senderType)?.toString().toUpperCase()}]: ${m.content}`)
       .join("\n");
 
     const analysis = await analyzeConversation(

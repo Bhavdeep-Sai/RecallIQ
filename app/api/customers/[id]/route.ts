@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db/client";
+import { getSupabaseAdmin } from "@/lib/db/client";
 import {
   customers,
   teamMembers,
@@ -16,77 +16,52 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  if (!process.env.DATABASE_URL) {
-    return NextResponse.json({ error: "No database" }, { status: 503 });
-  }
-
   try {
-    const db = getDb();
+    const supabase = getSupabaseAdmin();
 
-    const [customerRows, memoryRows, conversationRows, followUpRows] = await Promise.all([
-      db.select({
-        id: customers.id,
-        displayName: customers.displayName,
-        companyName: customers.companyName,
-        email: customers.email,
-        phone: customers.phone,
-        website: customers.website,
-        lifecycleStage: customers.lifecycleStage,
-        lifecycleScore: customers.lifecycleScore,
-        healthScore: customers.healthScore,
-        sentiment: customers.sentiment,
-        pricingRisk: customers.pricingRisk,
-        annualContractValueCents: customers.annualContractValueCents,
-        updatedAt: customers.updatedAt,
-        createdAt: customers.createdAt,
-        ownerName: teamMembers.fullName,
-        ownerEmail: teamMembers.email,
-        metadata: customers.metadata,
-      })
-        .from(customers)
-        .leftJoin(teamMembers, eq(customers.ownerMemberId, teamMembers.id))
-        .where(and(eq(customers.id, id), isNull(customers.deletedAt)))
-        .limit(1),
+    const p1 = supabase
+      .from("customers")
+      .select("*")
+      .eq("id", id)
+      .is("deleted_at", null)
+      .limit(1);
 
-      db.select()
-        .from(aiMemoryEntries)
-        .where(and(eq(aiMemoryEntries.customerId, id), isNull(aiMemoryEntries.deletedAt)))
-        .orderBy(desc(aiMemoryEntries.importance))
-        .limit(30),
+    const p2 = supabase
+      .from("ai_memory_entries")
+      .select("*")
+      .eq("customer_id", id)
+      .is("deleted_at", null)
+      .order("importance", { ascending: false })
+      .limit(30);
 
-      db.select({
-        id: conversations.id,
-        channel: conversations.channel,
-        subject: conversations.subject,
-        status: conversations.status,
-        summary: conversations.summary,
-        tone: conversations.tone,
-        outcome: conversations.outcome,
-        startedAt: conversations.startedAt,
-        endedAt: conversations.endedAt,
-        updatedAt: conversations.updatedAt,
-      })
-        .from(conversations)
-        .where(and(eq(conversations.customerId, id), isNull(conversations.deletedAt)))
-        .orderBy(desc(conversations.startedAt))
-        .limit(20),
+    const p3 = supabase
+      .from("conversations")
+      .select("id, channel, subject, status, summary, tone, outcome, started_at, ended_at, updated_at")
+      .eq("customer_id", id)
+      .is("deleted_at", null)
+      .order("started_at", { ascending: false })
+      .limit(20);
 
-      db.select()
-        .from(aiFollowUps)
-        .where(and(eq(aiFollowUps.customerId, id), isNull(aiFollowUps.deletedAt)))
-        .orderBy(desc(aiFollowUps.generatedAt))
-        .limit(10),
-    ]);
+    const p4 = supabase
+      .from("ai_follow_ups")
+      .select("*")
+      .eq("customer_id", id)
+      .is("deleted_at", null)
+      .order("generated_at", { ascending: false })
+      .limit(10);
 
-    if (!customerRows[0]) {
-      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
-    }
+    const [r1, r2, r3, r4] = await Promise.all([p1, p2, p3, p4]);
+
+    if (r1.error) return NextResponse.json({ error: r1.error.message }, { status: 500 });
+
+    const customerRow = (r1.data ?? [])[0];
+    if (!customerRow) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
 
     return NextResponse.json({
-      customer: customerRows[0],
-      memories: memoryRows,
-      conversations: conversationRows,
-      followUps: followUpRows,
+      customer: customerRow,
+      memories: r2.data ?? [],
+      conversations: r3.data ?? [],
+      followUps: r4.data ?? [],
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal server error";

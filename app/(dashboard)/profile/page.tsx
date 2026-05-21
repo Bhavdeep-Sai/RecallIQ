@@ -45,6 +45,8 @@ export default function ProfilePage() {
         badge="Account"
         title="Profile"
         description="Manage your personal details, notification preferences, and account security."
+        helpTitle="Profile page"
+        helpText="This page manages your personal account controls, including identity, security, and notification preferences. Use it to keep your profile current and review what the workspace can see about you."
         actions={
           <>
             {hasClerkPublishableKey ? (
@@ -308,7 +310,7 @@ function ActivityStat({ icon, label, value, sub, small }: { icon: React.ReactNod
         <p className="text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--text-secondary)" }}>{label}</p>
         <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{sub}</p>
       </div>
-      <p className={`font-bold shrink-0 truncate max-w-[140px] text-right ${small ? "text-sm" : "text-lg"}`} style={{ color: "var(--text-primary)" }}>{value}</p>
+      <p className={`font-bold shrink-0 truncate max-w-35 text-right ${small ? "text-sm" : "text-lg"}`} style={{ color: "var(--text-primary)" }}>{value}</p>
     </div>
   );
 }

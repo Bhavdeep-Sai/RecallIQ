@@ -15,7 +15,7 @@
 import { generateObject, generateText } from "ai";
 import { createGroq } from "@ai-sdk/groq";
 import { z } from "zod";
-import { getDb } from "@/lib/db/client";
+import { getDb, getSupabaseAdmin } from "@/lib/db/client";
 import {
   aiFollowUps,
   aiMemoryEntries,
@@ -572,28 +572,38 @@ export async function saveFollowUp(
   email: FollowUpEmail,
   dueAt?: Date,
 ): Promise<string | null> {
-  if (!process.env.DATABASE_URL) return null;
   try {
-    const db = getDb();
-    const [row] = await db.insert(aiFollowUps).values({
-      organizationId,
-      customerId,
-      conversationId,
-      title: email.subject,
-      body: email.body,
-      rationale: email.rationale,
-      priority: email.tone === "urgent" ? 1 : email.tone === "formal" ? 2 : 3,
-      status: "draft",
-      confidence: email.confidence,
-      modelName: "mixtral-8x7b-32768",
-      dueAt,
-      metadata: {
-        tone: email.tone,
-        personalizationNotes: email.personalizationNotes,
-      },
-    }).returning({ id: aiFollowUps.id });
-    return row?.id ?? null;
-  } catch {
+    const supabase = getSupabaseAdmin();
+
+    const { data, error } = await supabase
+      .from("ai_follow_ups")
+      .insert({
+        organization_id: organizationId,
+        customer_id: customerId,
+        conversation_id: conversationId,
+        title: email.subject,
+        body: email.body,
+        rationale: email.rationale,
+        priority: email.tone === "urgent" ? 1 : email.tone === "formal" ? 2 : 3,
+        status: "draft",
+        confidence: email.confidence,
+        model_name: "mixtral-8x7b-32768",
+        due_at: dueAt,
+        metadata: {
+          tone: email.tone,
+          personalizationNotes: email.personalizationNotes,
+        },
+      })
+      .select();
+
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("saveFollowUp supabase error:", error);
+      return null;
+    }
+
+    return (data && data[0] && (data[0].id ?? data[0].id)) || null;
+  } catch (e) {
     return null;
   }
 }
@@ -604,34 +614,60 @@ export async function loadCustomerIntelligenceData(
   organizationId: string,
   customerId: string,
 ) {
-  if (!process.env.DATABASE_URL) return null;
   try {
-    const db = getDb();
-    const [customerRow, memoryRows, conversationRows, followUpRows] = await Promise.all([
-      db.select().from(customers)
-        .where(and(eq(customers.id, customerId), eq(customers.organizationId, organizationId), isNull(customers.deletedAt)))
-        .limit(1),
-      db.select().from(aiMemoryEntries)
-        .where(and(eq(aiMemoryEntries.customerId, customerId), eq(aiMemoryEntries.organizationId, organizationId), isNull(aiMemoryEntries.deletedAt)))
-        .orderBy(desc(aiMemoryEntries.importance))
-        .limit(20),
-      db.select().from(conversations)
-        .where(and(eq(conversations.customerId, customerId), eq(conversations.organizationId, organizationId), isNull(conversations.deletedAt)))
-        .orderBy(desc(conversations.startedAt))
-        .limit(10),
-      db.select().from(aiFollowUps)
-        .where(and(eq(aiFollowUps.customerId, customerId), eq(aiFollowUps.organizationId, organizationId), isNull(aiFollowUps.deletedAt)))
-        .orderBy(desc(aiFollowUps.generatedAt))
-        .limit(10),
-    ]);
+    const supabase = getSupabaseAdmin();
+
+    const p1 = supabase
+      .from("customers")
+      .select("*")
+      .eq("id", customerId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .limit(1);
+
+    const p2 = supabase
+      .from("ai_memory_entries")
+      .select("*")
+      .eq("customer_id", customerId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .order("importance", { ascending: false })
+      .limit(20);
+
+    const p3 = supabase
+      .from("conversations")
+      .select("*")
+      .eq("customer_id", customerId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .order("started_at", { ascending: false })
+      .limit(10);
+
+    const p4 = supabase
+      .from("ai_follow_ups")
+      .select("*")
+      .eq("customer_id", customerId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .order("generated_at", { ascending: false })
+      .limit(10);
+
+    const [r1, r2, r3, r4] = await Promise.all([p1, p2, p3, p4]);
+
+    if (r1.error || r2.error || r3.error || r4.error) {
+      // eslint-disable-next-line no-console
+      console.error("loadCustomerIntelligenceData supabase errors:", r1.error, r2.error, r3.error, r4.error);
+    }
 
     return {
-      customer: customerRow[0] ?? null,
-      memories: memoryRows,
-      conversations: conversationRows,
-      followUps: followUpRows,
+      customer: (r1.data ?? [])[0] ?? null,
+      memories: r2.data ?? [],
+      conversations: r3.data ?? [],
+      followUps: r4.data ?? [],
     };
-  } catch {
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error("loadCustomerIntelligenceData error:", e);
     return null;
   }
 }

@@ -1,5 +1,7 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import {
-  ArrowUpRight,
   MessagesSquare,
   Phone,
   Mail,
@@ -7,7 +9,8 @@ import {
   MessageCircle,
   Clock,
   ChevronRight,
-  Info,
+  Plus,
+  Loader2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,8 +18,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/system/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ConversationsActions } from "@/components/dashboard/actions/conversations-actions";
+import { AddConversationModal } from "@/components/dashboard/add-conversation-modal";
 import { formatRelativeTime } from "@/lib/format";
-import { getSupabaseAdmin } from "@/lib/db/client";
 
 const channelConfig: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
   call:    { icon: <Phone className="h-3.5 w-3.5" />,         label: "Phone call",   color: "text-cyan-400 bg-cyan-500/10 border-cyan-400/20" },
@@ -27,39 +30,69 @@ const channelConfig: Record<string, { icon: React.ReactNode; label: string; colo
 
 const toneVariant: Record<string, "success" | "warning" | "secondary" | "destructive"> = {
   positive:        "success",
-  "price-sensitive": "warning",
+  "price_sensitive": "warning",
   guarded:         "secondary",
   urgent:          "destructive",
   neutral:         "secondary",
 };
 
-export default async function ConversationsPage() {
-  let conversationRecords: any[] = [];
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    try {
-      const supabase = getSupabaseAdmin();
-      const { data } = await supabase
-        .from("conversations")
-        .select(`
-          id, channel, summary, tone, outcome, updated_at,
-          customer:customers ( display_name )
-        `)
-        .is("deleted_at", null)
-        .order("updated_at", { ascending: false });
+export default function ConversationsPage() {
+  const [conversationRecords, setConversationRecords] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
 
-      conversationRecords = (data ?? []).map((c: any) => ({
-        id: c.id,
-        customer: c.customer?.display_name ?? null,
-        channel: c.channel,
-        summary: c.summary,
-        tone: c.tone,
-        nextStep: c.outcome,
-        updatedAt: c.updated_at,
-      }));
-    } catch {
-      // DB unreachable
-    }
-  }
+  // Fetch conversations and customers on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch conversations
+        const convRes = await fetch("/api/conversations");
+        if (convRes.ok) {
+          const convData = await convRes.json();
+          setConversationRecords(convData || []);
+        }
+
+        // Fetch customers and normalize fields for UI
+        const custRes = await fetch("/api/customers");
+        if (custRes.ok) {
+          const custData = await custRes.json();
+          const raw = custData.customers || [];
+          // Normalize to { id, company, name }
+          const normalized = raw.map((c: any) => ({
+            id: c.id,
+            company: c.company_name || c.company || "",
+            name: c.display_name || c.name || "",
+          }));
+          setCustomers(normalized);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleSuccess = () => {
+    // Refresh conversations
+    const fetchConversations = async () => {
+      try {
+        const res = await fetch("/api/conversations");
+        if (res.ok) {
+          const data = await res.json();
+          setConversationRecords(data || []);
+        }
+      } catch (error) {
+        console.error("Error refreshing conversations:", error);
+      }
+    };
+    fetchConversations();
+  };
 
   return (
     <div className="space-y-6">
@@ -68,22 +101,27 @@ export default async function ConversationsPage() {
         badge="Conversation intelligence"
         title="Conversations"
         description="See how RecallIQ compresses call notes, email context, and meeting history into persistent sales memory."
-        actions={<ConversationsActions />}
+        helpTitle="How to read this page"
+        helpText="Each card is one conversation with a customer. The tone badge shows how the customer felt, and the next step tells you what to do next. Use this page to review context, summarize history, and jump back into the right follow-up action."
+        actions={
+          <div className="flex gap-2">
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Conversation
+            </Button>
+            <ConversationsActions />
+          </div>
+        }
       />
 
-      {/* Beginner helper */}
-      <div className="rounded-xl border border-blue-400/15 bg-blue-500/8 p-4 flex gap-3">
-        <Info className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
-        <p className="text-sm text-slate-400 leading-relaxed">
-          <span className="text-slate-200 font-medium">How to read this: </span>
-          Each card is one conversation with a customer. The tone badge shows how the customer felt (positive, guarded, price-sensitive). The "Next step" tells you what to do next.
-        </p>
-      </div>
-
-      {!conversationRecords.length ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        </div>
+      ) : !conversationRecords.length ? (
         <EmptyState
-          actionLabel="Import conversations"
-          description="Conversation records are empty. Once connected, this view will highlight sentiment, objections, and next best actions."
+          actionLabel="Add your first conversation"
+          description="No conversations recorded yet. Click 'Add Conversation' to create one, or sync from your CRM."
           icon={<MessagesSquare className="h-7 w-7" />}
           title="No conversations yet"
         />
@@ -94,6 +132,14 @@ export default async function ConversationsPage() {
           ))}
         </div>
       )}
+
+      {/* Add Conversation Modal */}
+      <AddConversationModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSuccess={handleSuccess}
+        customers={customers}
+      />
     </div>
   );
 }

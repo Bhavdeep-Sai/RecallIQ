@@ -1,5 +1,4 @@
 import {
-  ArrowUpRight,
   BarChart3,
   TrendingUp,
   DollarSign,
@@ -7,10 +6,8 @@ import {
   Activity,
   Clock,
   Lightbulb,
-  Info,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -66,17 +63,10 @@ export default async function AnalyticsPage() {
         badge="Business analytics"
         title="Analytics"
         description="Monitor adoption, memory usage, revenue lift, and operating efficiency in one executive view."
+        helpTitle="Reading this page"
+        helpText="The metric cards at the top show the key numbers. The activity chart shows movement over time, and the takeaways section highlights what is going well and what needs attention. Use this page to spot trends in adoption, spend, and operational performance."
         actions={<AnalyticsActions />}
       />
-
-      {/* Beginner helper */}
-      <div className="rounded-xl border border-blue-400/15 bg-blue-500/8 p-4 flex gap-3">
-        <Info className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
-        <p className="text-sm text-slate-400 leading-relaxed">
-          <span className="text-slate-200 font-medium">Reading this page: </span>
-          The metric cards at the top show your key numbers. The bar chart shows activity over the past week. The takeaways section highlights what&apos;s going well and what needs attention.
-        </p>
-      </div>
 
       {/* Metric cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -86,7 +76,7 @@ export default async function AnalyticsPage() {
           return (
             <Card key={metric.label}>
               <CardContent className="p-5">
-                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br border mb-3 ${color}`}>
+                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br border mb-3 ${color}`}>
                   <Icon className="h-4 w-4" />
                 </div>
                 <p className="text-2xl font-bold text-white">{metric.value}</p>
@@ -123,7 +113,7 @@ export default async function AnalyticsPage() {
                       <div className="h-2.5 rounded-full bg-white/6 overflow-hidden">
                         {pct > 0 && (
                           <div
-                            className="h-2.5 rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 transition-all duration-700"
+                            className="h-2.5 rounded-full bg-linear-to-r from-cyan-400 to-violet-400 transition-all duration-700"
                             style={{ width: `${pct}%` }}
                           />
                         )}

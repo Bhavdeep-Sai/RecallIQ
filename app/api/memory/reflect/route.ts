@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { reflectAndConsolidate } from "@/lib/services/memory";
-import { getDb } from "@/lib/db/client";
-import { aiMemoryEntries } from "@/lib/db/schema";
-import { isNull } from "drizzle-orm";
+import { getSupabaseAdmin } from "@/lib/db/client";
+
+type MemoryTargetRow = {
+  organization_id: string;
+  customer_id: string;
+};
 
 export async function POST(req: Request) {
   try {
@@ -12,16 +15,24 @@ export async function POST(req: Request) {
     let finalCustomerId = customerId;
 
     if (!finalOrgId || !finalCustomerId) {
-      const db = getDb();
-      const [latest] = await db.select()
-        .from(aiMemoryEntries)
-        .where(isNull(aiMemoryEntries.deletedAt))
-        .orderBy(aiMemoryEntries.createdAt)
+      const supabase = getSupabaseAdmin();
+      const { data: latestRows, error } = await supabase
+        .from("ai_memory_entries")
+        .select("organization_id, customer_id")
+        .is("deleted_at", null)
+        .not("customer_id", "is", null)
+        .order("created_at", { ascending: false })
         .limit(1);
+
+      if (error) {
+        throw new Error(`Failed to resolve memory target: ${error.message}`);
+      }
+
+      const latest = latestRows?.[0] as MemoryTargetRow | undefined;
         
       if (latest) {
-        finalOrgId = latest.organizationId;
-        finalCustomerId = latest.customerId;
+        finalOrgId = latest.organization_id;
+        finalCustomerId = latest.customer_id;
       } else {
         return NextResponse.json({ error: "No active memories found to consolidate" }, { status: 400 });
       }
@@ -30,8 +41,9 @@ export async function POST(req: Request) {
     const result = await reflectAndConsolidate(finalOrgId, finalCustomerId);
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal server error";
     console.error("Reflection Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

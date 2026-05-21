@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db/client";
-import { conversations, customers } from "@/lib/db/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { getSupabaseAdmin } from "@/lib/db/client";
 import { generateFollowUpEmail, saveFollowUp } from "@/lib/services/sales-ai";
 import { injectMemory } from "@/lib/services/memory";
 
@@ -20,15 +18,21 @@ export async function POST(req: Request) {
     let finalConversationId = conversationId;
 
     if (!finalCustomerId) {
-      const db = getDb();
-      const [latest] = await db.select()
-        .from(conversations)
-        .where(isNull(conversations.deletedAt))
-        .orderBy(conversations.startedAt)
+      const supabase = getSupabaseAdmin();
+      const { data: latestArr, error: latestError } = await supabase
+        .from("conversations")
+        .select("id, customer_id")
+        .is("deleted_at", null)
+        .order("started_at", { ascending: false })
         .limit(1);
-      
+
+      if (latestError) {
+        throw new Error(latestError.message);
+      }
+
+      const latest = (latestArr ?? [])[0];
       if (latest) {
-        finalCustomerId = latest.customerId;
+        finalCustomerId = latest.customer_id;
         finalConversationId = latest.id;
       } else {
         return NextResponse.json({ error: "No customers or conversations found to generate follow-up" }, { status: 400 });
@@ -50,24 +54,39 @@ export async function POST(req: Request) {
       });
     }
 
-    const db = getDb();
+    const supabase = getSupabaseAdmin();
 
     // Load customer + conversation
-    const [customerRow] = await db.select()
-      .from(customers)
-      .where(and(eq(customers.id, finalCustomerId), isNull(customers.deletedAt)))
+    const { data: customerRows, error: customerError } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("id", finalCustomerId)
+      .is("deleted_at", null)
       .limit(1);
 
+    if (customerError) {
+      throw new Error(customerError.message);
+    }
+
+    const customerRow = (customerRows ?? [])[0];
     if (!customerRow) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
     let conversationSummary = "No recent conversation available.";
-    if (conversationId) {
-      const [convRow] = await db.select()
-        .from(conversations)
-        .where(and(eq(conversations.id, finalConversationId), isNull(conversations.deletedAt)))
+    if (finalConversationId) {
+      const { data: convRows, error: convError } = await supabase
+        .from("conversations")
+        .select("summary")
+        .eq("id", finalConversationId)
+        .is("deleted_at", null)
         .limit(1);
+
+      if (convError) {
+        throw new Error(convError.message);
+      }
+
+      const convRow = (convRows ?? [])[0];
       if (convRow?.summary) conversationSummary = convRow.summary;
     }
 

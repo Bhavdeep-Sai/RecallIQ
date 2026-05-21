@@ -3,11 +3,7 @@ import {
   Building2,
   Shield,
   Plug,
-  Save,
-  ExternalLink,
   CheckCircle2,
-  Info,
-  Users,
   Globe,
   Mail,
   BrainCircuit,
@@ -16,7 +12,6 @@ import {
   Lock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,17 +28,10 @@ export default function SettingsPage() {
         badge="Workspace settings"
         title="Settings"
         description="Configure organization details, memory behavior, and runtime policy thresholds."
+        helpTitle="Workspace settings"
+        helpText="These controls affect the entire workspace. Use this page to manage branding, support contact details, runtime policy toggles, and integration notes for your team."
         actions={<SettingsActions />}
       />
-
-      {/* Info banner */}
-      <div className="rounded-xl border border-blue-400/15 bg-blue-500/8 p-4 flex gap-3">
-        <Info className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
-        <p className="text-sm text-slate-400 leading-relaxed">
-          <span className="text-slate-200 font-medium">Settings guide: </span>
-          Changes here affect your entire workspace. The workspace profile controls branding and contact info. Policy controls toggle AI features on or off. Integration notes are for your team's reference.
-        </p>
-      </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
 
@@ -60,18 +48,21 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <FormField
+              id="workspace-name"
               icon={<Building2 className="h-3.5 w-3.5" />}
               label="Workspace name"
               hint="The name shown across the platform"
               defaultValue="RecallIQ Sales OS"
             />
             <FormField
+              id="primary-domain"
               icon={<Globe className="h-3.5 w-3.5" />}
               label="Primary domain"
               hint="Your organization's main domain"
               defaultValue="recalliq.ai"
             />
             <FormField
+              id="support-inbox"
               icon={<Mail className="h-3.5 w-3.5" />}
               label="Support inbox"
               hint="Where support requests are routed"
@@ -157,11 +148,13 @@ export default function SettingsPage() {
 }
 
 function FormField({
+  id,
   label,
   hint,
   defaultValue,
   icon,
 }: {
+  id: string;
   label: string;
   hint: string;
   defaultValue: string;
@@ -169,11 +162,11 @@ function FormField({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+      <label htmlFor={id} className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
         {icon && <span className="text-slate-500">{icon}</span>}
         {label}
       </label>
-      <Input defaultValue={defaultValue} />
+      <Input id={id} defaultValue={defaultValue} />
       <p className="text-[11px] text-slate-600">{hint}</p>
     </div>
   );

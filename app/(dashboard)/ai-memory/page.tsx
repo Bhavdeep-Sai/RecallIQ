@@ -1,6 +1,5 @@
-import { ArrowUpRight, BrainCircuit, Tag, Clock, Percent, Shield, Link2, Filter, Info } from "lucide-react";
+import { BrainCircuit, Tag, Clock, Percent, Shield, Link2, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/system/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -40,17 +39,10 @@ export default async function AiMemoryPage() {
         badge="Hindsight memory"
         title="AI Memory"
         description="RecallIQ stores objections, tone, pricing pressure, and customer context so every new conversation starts with retained understanding."
+        helpTitle="What AI Memory does"
+        helpText="Every time a customer mentions a concern, objection, or preference, RecallIQ stores it here. The memory layer is what lets the AI remember context across sessions and avoid starting from scratch on every new conversation."
         actions={<MemoryActions />}
       />
-
-      {/* Explainer */}
-      <div className="rounded-xl p-4 flex gap-3" style={{ background: "var(--info-bg)", border: "1px solid var(--info-border)" }}>
-        <Info className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "var(--info-text)" }} />
-        <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
-          <span className="font-medium" style={{ color: "var(--text-primary)" }}>What is AI Memory? </span>
-          Every time a customer mentions a concern, objection, or preference, RecallIQ saves it here. Next time your team talks to that customer, the AI already knows the context — no need to start from scratch.
-        </p>
-      </div>
 
       {!memories.length ? (
         <EmptyState

@@ -39,32 +39,40 @@ export function getSupabaseAdmin() {
 // ─── Drizzle client (direct SQL) ──────────────────────────────────────────
 
 /**
- * Attempt to fix the DATABASE_URL for Supabase Transaction Pooler.
- * The pooler requires the username in `postgres.{project_ref}` format.
- * If the URL has plain `postgres`, auto-inject the project ref.
+ * Attempt to normalize the DATABASE_URL for Supabase Transaction Pooler.
+ * The pooler requires the username in `postgres.{project_ref}` format and
+ * benefits from explicit SNI hints when connecting through postgres.js.
  */
-function buildConnectionString(raw: string): string {
-  try {
-    const decoded = raw.replace(/%40/g, "@").replace(/%23/g, "#");
-    const url = new URL(decoded);
+function buildConnectionConfig(raw: string) {
+  const decoded = raw.replace(/%40/g, "@").replace(/%23/g, "#");
+  const url = new URL(decoded);
+  const isPooler = url.hostname.includes("pooler.supabase.com");
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const projectHost = supabaseUrl ? new URL(supabaseUrl).hostname : null;
 
-    if (url.hostname.includes("pooler.supabase.com") && !url.username.includes(".")) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      if (supabaseUrl) {
-        const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
-        if (projectRef) {
-          const encodedPass = encodeURIComponent(decodeURIComponent(url.password));
-          return `postgresql://${url.username}.${projectRef}:${encodedPass}@${url.hostname}:${url.port || 5432}${url.pathname}`;
-        }
-      }
-    }
-
-    // Try direct connection format if pooler is failing
-    // db.{project_ref}.supabase.co:5432 doesn't need project ref in username
-    return raw;
-  } catch {
-    return raw;
+  let username = decodeURIComponent(url.username);
+  if (isPooler && projectHost && !username.includes(".")) {
+    username = `${username}.${projectHost.split(".")[0]}`;
   }
+
+  const ssl: { rejectUnauthorized: boolean; servername?: string } = { rejectUnauthorized: false };
+  if (isPooler && projectHost) {
+    ssl.servername = projectHost;
+  }
+
+  const connectionString = isPooler && projectHost
+    ? `${url.protocol}//${encodeURIComponent(username)}:${encodeURIComponent(decodeURIComponent(url.password))}@${url.hostname}:${url.port || 5432}${url.pathname}${url.search ? `${url.search}&` : "?"}options=${encodeURIComponent(`--sni-hostname=${projectHost}`)}&sni_hostname=${encodeURIComponent(projectHost)}&external_id=${encodeURIComponent(projectHost.split(".")[0])}`
+    : raw;
+
+  return {
+    host: url.hostname,
+    port: parseInt(url.port) || 5432,
+    database: url.pathname.slice(1) || "postgres",
+    user: username,
+    password: decodeURIComponent(url.password),
+    ssl,
+    connectionString,
+  };
 }
 
 export function createDatabaseClient() {
@@ -73,33 +81,33 @@ export function createDatabaseClient() {
     throw new Error("Missing required environment variable: DATABASE_URL");
   }
 
-  const fixedUrl = buildConnectionString(connectionString);
-
-  let client: ReturnType<typeof postgres>;
   try {
-    const decoded = fixedUrl.replace(/%40/g, "@").replace(/%23/g, "#");
-    const url = new URL(decoded);
+    const config = buildConnectionConfig(connectionString);
 
-    // Always pass explicit params to avoid postgres.js DNS bug with dotted usernames
-    client = postgres({
-      host:            url.hostname,
-      port:            parseInt(url.port) || 5432,
-      database:        url.pathname.slice(1) || "postgres",
-      user:            decodeURIComponent(url.username),
-      password:        decodeURIComponent(url.password),
-      ssl:             { rejectUnauthorized: false },
-      prepare:         false,
-      max:             5,
-      idle_timeout:    20,
+    // Prefer explicit options to avoid postgres.js DNS/SNI edge cases.
+    const client = postgres(config.connectionString, {
+      host: config.host,
+      port: config.port,
+      database: config.database,
+      user: config.user,
+      password: config.password,
+      ssl: config.ssl,
+      prepare: false,
+      max: 5,
+      idle_timeout: 20,
       connect_timeout: 15,
     });
-  } catch {
-    client = postgres(connectionString, {
-      prepare: false, max: 5, ssl: { rejectUnauthorized: false },
-    });
-  }
 
-  return drizzle(client, { schema });
+    return drizzle(client, { schema });
+  } catch {
+    const client = postgres(connectionString, {
+      prepare: false,
+      max: 5,
+      ssl: { rejectUnauthorized: false },
+    });
+
+    return drizzle(client, { schema });
+  }
 }
 
 let _drizzle: Database | null = null;

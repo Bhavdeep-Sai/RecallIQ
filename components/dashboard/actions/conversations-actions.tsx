@@ -8,28 +8,37 @@ import toast from "react-hot-toast";
 export function ConversationsActions() {
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const handleSync = () => {
+  const handleSync = async () => {
     if (isSyncing) return;
     setIsSyncing(true);
-    
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 3000)),
-      {
-        loading: "Syncing transcripts from CRM...",
-        success: "3 new conversations synced",
-        error: "Failed to sync transcripts",
+
+    try {
+      const response = await fetch("/api/conversations/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to sync transcripts");
       }
-    ).finally(() => {
+
+      if (data.syncedCount > 0) {
+        toast.success(data.message ?? `Synced ${data.syncedCount} conversation(s)`);
+      } else {
+        toast(data.message ?? "No new conversations to sync");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to sync transcripts");
+    } finally {
       setIsSyncing(false);
-    });
+    }
   };
 
   return (
-    <>
-      <Button onClick={handleSync} disabled={isSyncing}>
-        {isSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-        Sync transcripts
-      </Button>
-    </>
+    <Button onClick={handleSync} disabled={isSyncing}>
+      {isSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+      Sync transcripts
+    </Button>
   );
 }

@@ -1,14 +1,63 @@
 "use client";
 
-import { Bell, Menu, Search, HelpCircle, LogOut, User, Settings2 } from "lucide-react";
+import { Bell, Menu, Search, HelpCircle, LogOut, User, Settings2, Sparkles, ShieldAlert, MessageSquareText } from "lucide-react";
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { hasClerkPublishableKey } from "@/lib/auth-flags";
 import { useUiStore } from "@/store/ui-store";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { HoverTooltip } from "@/components/ui/hover-tooltip";
+
+const pageHelp: Record<string, { title: string; content: ReactNode }> = {
+  "/": {
+    title: "Overview",
+    content: <p>Executive snapshot of memory, runtime health, and AI spend. Use this page to see whether the product is stable and where the team should focus next.</p>,
+  },
+  "/customers": {
+    title: "Customers",
+    content: <p>Customer accounts, deal health, and forecast context live here. Hover the cards to inspect risk, health, and the memory-backed signals tied to each account.</p>,
+  },
+  "/conversations": {
+    title: "Conversations",
+    content: <p>Every conversation card represents a call, email, or meeting. The summary shows what happened, tone shows how the customer felt, and next step shows what the rep should do next.</p>,
+  },
+  "/ai-memory": {
+    title: "AI Memory",
+    content: <p>This page stores objections, tone, pricing pressure, stakeholder notes, and other durable signals. It is the long-term context layer used by the AI across sessions.</p>,
+  },
+  "/runtime-intelligence": {
+    title: "Runtime Intelligence",
+    content: <p>Monitor routing decisions, rule enforcement, latency, and model behavior. This view helps you understand how the AI is behaving in production.</p>,
+  },
+  "/analytics": {
+    title: "Analytics",
+    content: <p>Revenue, adoption, memory usage, and operating efficiency are summarized here. The charts and takeaways show what is growing, what is costing money, and what needs attention.</p>,
+  },
+  "/follow-ups": {
+    title: "Follow-ups",
+    content: <p>Review memory-aware follow-up drafts and scheduled actions. This is where the product turns conversation context into concrete next steps.</p>,
+  },
+  "/settings": {
+    title: "Settings",
+    content: <p>Workspace preferences, integrations, and profile controls are managed here. Use it to adjust the app behavior and account details.</p>,
+  },
+  "/profile": {
+    title: "Profile",
+    content: <p>Manage your identity, security settings, and notification preferences. This page reflects the personal account controls for the current user.</p>,
+  },
+};
+
+function findHelpForPath(pathname: string | null) {
+  if (!pathname) return pageHelp["/"];
+  const exact = pageHelp[pathname];
+  if (exact) return exact;
+  const base = pathname.split("/")[1];
+  return pageHelp[`/${base}`] ?? pageHelp["/"];
+}
 
 function UserMenu() {
   const [open, setOpen] = useState(false);
@@ -127,6 +176,26 @@ function DropdownLink({ href, icon, label, onClick }: { href: string; icon: Reac
 
 export function Topbar() {
   const toggleMobileSidebar = useUiStore((state) => state.toggleMobileSidebar);
+  const pathname = usePathname();
+  const help = findHelpForPath(pathname);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const notifications = [
+    { icon: <Sparkles className="h-4 w-4 text-cyan-400" />, title: "Memory sync ready", text: "The latest conversation notes can be synchronized from this workspace.", time: "Now" },
+    { icon: <ShieldAlert className="h-4 w-4 text-amber-400" />, title: "Guardrails active", text: "Runtime policies are enforcing safe model routing and data handling.", time: "5m" },
+    { icon: <MessageSquareText className="h-4 w-4 text-emerald-400" />, title: "Conversation insight", text: "New follow-up suggestions are available in the conversations timeline.", time: "1h" },
+  ];
 
   return (
     <header className="topbar-bg sticky top-0 z-20">
@@ -145,14 +214,66 @@ export function Topbar() {
 
         {/* Right actions */}
         <div className="ml-auto flex items-center gap-2">
-          <Button size="icon" variant="ghost" className="h-9 w-9" aria-label="Help">
-            <HelpCircle className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
-          </Button>
+          <HoverTooltip
+            align="end"
+            trigger={
+              <Button size="icon" variant="ghost" className="h-9 w-9" aria-label="Help">
+                <HelpCircle className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
+              </Button>
+            }
+            contentClassName="dropdown-bg"
+            content={
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--green-400)" }}>{help.title}</p>
+                <div className="text-sm leading-relaxed" style={{ color: "var(--text-primary)" }}>{help.content}</div>
+              </div>
+            }
+          />
 
-          <Button size="icon" variant="ghost" className="h-9 w-9 relative" aria-label="Notifications">
-            <Bell className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
-            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-green-400" />
-          </Button>
+          <div className="relative" ref={notificationRef}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 relative"
+              aria-label="Notifications"
+              aria-expanded={notificationsOpen}
+              onClick={() => setNotificationsOpen((open) => !open)}
+            >
+              <Bell className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
+              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-green-400" />
+            </Button>
+
+            {notificationsOpen && (
+              <div className="dropdown-bg absolute right-0 top-11 z-50 w-88 rounded-2xl p-3">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Notifications</p>
+                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Recent workspace updates</p>
+                  </div>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest" style={{ background: "var(--success-bg)", color: "var(--success-text)" }}>
+                    Live
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {notifications.map((item) => (
+                    <div key={item.title} className="rounded-xl border p-3" style={{ background: "var(--surface-overlay-bg)", borderColor: "var(--surface-overlay-border)" }}>
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5">{item.icon}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{item.title}</p>
+                            <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>{item.time}</span>
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{item.text}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           <ThemeToggle />
 

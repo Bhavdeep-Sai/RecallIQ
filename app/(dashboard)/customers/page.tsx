@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   Users,
   TrendingUp,
@@ -6,7 +5,6 @@ import {
   Clock,
   DollarSign,
   UserCircle,
-  Info,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,19 +60,12 @@ export default async function CustomersPage() {
         badge="Customer intelligence"
         title="Customers"
         description="Track account health, deal risk, and the context RecallIQ remembers across every customer session."
+        helpTitle="How to read this page"
+        helpText="Each card represents one customer account. The health score shows engagement, pricing risk shows likely pushback, and the forecast is the expected deal value. Use this page to prioritize accounts and understand which ones need attention first."
         actions={
           <CustomersActions customers={customerRecords} />
         }
       />
-
-      {/* Explainer */}
-      <div className="rounded-xl p-4 flex gap-3" style={{ background: "var(--info-bg)", border: "1px solid var(--info-border)" }}>
-        <Info className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "var(--info-text)" }} />
-        <div className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
-          <span className="font-medium" style={{ color: "var(--text-primary)" }}>How to read this page: </span>
-          Each card represents one of your customers. The health score (0–100) shows how engaged they are. Pricing risk tells you if they might push back on price. Forecast is the expected deal value.
-        </div>
-      </div>
 
       {!customerRecords.length ? (
         <EmptyState
