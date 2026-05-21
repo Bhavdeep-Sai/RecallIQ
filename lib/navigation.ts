@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  Bell,
   BrainCircuit,
   LayoutDashboard,
   MessagesSquare,
@@ -51,5 +52,11 @@ export const navigationItems: NavigationItem[] = [
     href: "/analytics",
     description: "Revenue, adoption, and usage",
     icon: BarChart3,
+  },
+  {
+    label: "Notifications",
+    href: "/notifications",
+    description: "Alerts, follow-ups, and activity",
+    icon: Bell,
   },
 ];

@@ -2,7 +2,7 @@
 
 import {
   Bell, Menu, Search, HelpCircle, LogOut, User, Settings2,
-  Sparkles, ShieldAlert, MessageSquareText, Clock, Wallet, AlertTriangle, CheckCircle2,
+  Sparkles, ShieldAlert, MessageSquareText, Clock, Wallet, AlertTriangle, CheckCircle2, CheckCheck,
 } from "lucide-react";
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { hasClerkPublishableKey } from "@/lib/auth-flags";
 import { useUiStore } from "@/store/ui-store";
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HoverTooltip } from "@/components/ui/hover-tooltip";
@@ -52,6 +53,10 @@ const pageHelp: Record<string, { title: string; content: ReactNode }> = {
   "/profile": {
     title: "Profile",
     content: <p>Manage your identity, security settings, and notification preferences. This page reflects the personal account controls for the current user.</p>,
+  },
+  "/notifications": {
+    title: "Notifications",
+    content: <p>All workspace notifications in one place — new conversations, pending follow-ups, escalation alerts, high-importance memory captures, and budget warnings. Click any item to navigate directly to it.</p>,
   },
 };
 
@@ -219,10 +224,29 @@ export function Topbar() {
   const pathname = usePathname();
   const help = findHelpForPath(pathname);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [hoverOpen, setHoverOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const router = useRouter();
+
+  // Read-state via localStorage (synced with notifications page)
+  const LS_KEY = "recalliq_read_notifs";
+  const getReadIds = (): Set<string> => {
+    try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) ?? "[]") as string[]); } catch { return new Set(); }
+  };
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  useEffect(() => { setReadIds(getReadIds()); }, []);
+
+  const markAllRead = () => {
+    const all = new Set(notifications.map((n) => n.id));
+    setReadIds(all);
+    setUnreadCount(0);
+    try { localStorage.setItem(LS_KEY, JSON.stringify([...all])); } catch { /* ignore */ }
+  };
 
   const fetchNotifications = useCallback(async () => {
     setNotifLoading(true);
@@ -232,13 +256,17 @@ export function Topbar() {
         const json = await res.json();
         const items: Notification[] = json.notifications ?? [];
         setNotifications(items);
-        setUnreadCount((prev) => (notificationsOpen ? 0 : items.length));
+        const currentRead = getReadIds();
+        setReadIds(currentRead);
+        const unread = items.filter((n) => !currentRead.has(n.id)).length;
+        setUnreadCount(notificationsOpen ? 0 : unread);
       }
     } catch {
       // non-critical — silently fail
     } finally {
       setNotifLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificationsOpen]);
 
   // Fetch on mount + every 60 s
@@ -264,9 +292,18 @@ export function Topbar() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  const handleMouseEnter = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    setHoverOpen(true);
+    fetchNotifications();
+  };
+
+  const handleMouseLeave = () => {
+    hoverTimeout.current = setTimeout(() => setHoverOpen(false), 180);
+  };
+
   const handleOpen = () => {
-    setNotificationsOpen((v) => !v);
-    setUnreadCount(0);
+    router.push("/notifications");
   };
 
   return (
@@ -302,13 +339,17 @@ export function Topbar() {
             }
           />
 
-          <div className="relative" ref={notificationRef}>
+          <div
+            className="relative"
+            ref={notificationRef}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
             <Button
               size="icon"
               variant="ghost"
               className="h-9 w-9 relative"
               aria-label="Notifications"
-              aria-expanded={notificationsOpen}
               onClick={handleOpen}
             >
               <Bell className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
@@ -322,52 +363,75 @@ export function Topbar() {
               )}
             </Button>
 
-            {notificationsOpen && (
-              <div className="dropdown-bg absolute right-0 top-11 z-50 rounded-2xl p-3" style={{ width: "340px" }}>
+            {/* Hover preview panel */}
+            {hoverOpen && (
+              <div
+                className="dropdown-bg absolute right-0 top-11 z-50 rounded-2xl"
+                style={{ width: "360px", padding: "14px" }}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+              >
                 {/* Header */}
-                <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Notifications</p>
                     <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                      {notifications.length > 0 ? `${notifications.length} recent update${notifications.length !== 1 ? "s" : ""}` : "All caught up"}
+                      {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
                     </p>
                   </div>
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest"
-                    style={{ background: "var(--success-bg)", color: "var(--success-text)" }}>
-                    Live
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); markAllRead(); }}
+                        className="flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg transition-all"
+                        style={{ background: "rgba(34,197,94,0.1)", color: "var(--green-400)", border: "1px solid rgba(34,197,94,0.2)" }}
+                      >
+                        <CheckCheck className="h-3 w-3" />
+                        Mark all read
+                      </button>
+                    )}
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest"
+                      style={{ background: "var(--success-bg)", color: "var(--success-text)" }}>
+                      Live
+                    </span>
+                  </div>
                 </div>
 
-                {/* Body */}
-                <div className="space-y-2" style={{ maxHeight: "420px", overflowY: "auto" }}>
+                {/* Items — unread only */}
+                <div className="flex flex-col gap-3" style={{ maxHeight: "380px", overflowY: "auto" }}>
                   {notifLoading && notifications.length === 0 ? (
                     Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="rounded-xl border p-3 animate-pulse"
+                      <div key={i} className="rounded-xl border p-4 animate-pulse"
                         style={{ background: "var(--surface-overlay-bg)", borderColor: "var(--surface-overlay-border)" }}>
                         <div className="flex gap-3">
                           <div className="h-4 w-4 rounded-full mt-0.5 shrink-0" style={{ background: "var(--border-default)" }} />
-                          <div className="flex-1 space-y-1.5">
+                          <div className="flex-1 space-y-2">
                             <div className="h-3 rounded w-3/4" style={{ background: "var(--border-default)" }} />
                             <div className="h-2.5 rounded w-full" style={{ background: "var(--border-subtle)" }} />
                           </div>
                         </div>
                       </div>
                     ))
-                  ) : notifications.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 py-8">
-                      <AlertTriangle className="h-8 w-8" style={{ color: "var(--text-faint)" }} />
-                      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>No recent activity</p>
-                      <p className="text-xs text-center" style={{ color: "var(--text-faint)" }}>
-                        Notifications will appear as your workspace gets activity.
-                      </p>
-                    </div>
-                  ) : (
-                    notifications.map((item) => {
+                  ) : (() => {
+                    const unread = notifications.filter((n) => !readIds.has(n.id)).slice(0, 5);
+                    if (unread.length === 0) return (
+                      <div className="flex flex-col items-center gap-3 py-8">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full"
+                          style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
+                          <CheckCheck className="h-6 w-6" style={{ color: "var(--green-400)" }} />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>You&apos;re all caught up!</p>
+                          <p className="text-xs mt-0.5" style={{ color: "var(--text-faint)" }}>No unread notifications</p>
+                        </div>
+                      </div>
+                    );
+                    return unread.map((item) => {
                       const card = (
                         <div
-                          className="rounded-xl border p-3 transition-opacity hover:opacity-90 cursor-pointer"
+                          className="rounded-xl border p-4 transition-all hover:shadow-sm"
                           style={{
-                            background: "var(--surface-overlay-bg)",
+                            background: "rgba(34,197,94,0.04)",
                             borderColor: urgencyBorder(item.kind),
                             borderLeftWidth: "3px",
                           }}
@@ -375,26 +439,40 @@ export function Topbar() {
                           <div className="flex items-start gap-3">
                             <div className="mt-0.5 shrink-0">{notificationIcon(item.kind)}</div>
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.title}</p>
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <p className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>{item.title}</p>
                                 <span className="text-[10px] uppercase tracking-widest shrink-0" style={{ color: "var(--text-faint)" }}>
                                   {relativeTime(item.createdAt)}
                                 </span>
                               </div>
-                              <p className="mt-1 text-xs leading-relaxed line-clamp-2" style={{ color: "var(--text-secondary)" }}>{item.text}</p>
+                              <p className="text-xs leading-relaxed line-clamp-2" style={{ color: "var(--text-secondary)" }}>{item.text}</p>
                             </div>
                           </div>
                         </div>
                       );
                       return item.href ? (
-                        <Link key={item.id} href={item.href} onClick={() => setNotificationsOpen(false)}>
+                        <Link key={item.id} href={item.href} onClick={() => setHoverOpen(false)}>
                           {card}
                         </Link>
                       ) : (
                         <div key={item.id}>{card}</div>
                       );
-                    })
-                  )}
+                    });
+                  })()}
+                </div>
+
+
+                {/* Footer */}
+                <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                  <Link
+                    href="/notifications"
+                    onClick={() => setHoverOpen(false)}
+                    className="flex items-center justify-center gap-1.5 w-full rounded-xl py-2 text-xs font-semibold transition-all"
+                    style={{ background: "rgba(34,197,94,0.08)", color: "var(--green-400)", border: "1px solid rgba(34,197,94,0.15)" }}
+                  >
+                    <Bell className="h-3.5 w-3.5" />
+                    View all notifications
+                  </Link>
                 </div>
               </div>
             )}
