@@ -51,7 +51,7 @@ export async function ingestMemory(
 Message: "${messageContent}"`,
   });
 
-  const insertedMemories = [];
+  const insertedMemories: Record<string, unknown>[] = [];
 
   const supabase = getSupabaseAdmin();
 
@@ -59,7 +59,8 @@ Message: "${messageContent}"`,
     // Generate embedding for the semantic summary
     const embedding = await generateEmbedding(memory.summary);
 
-    const { data: inserted, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: inserted, error } = await (supabase as any)
       .from("ai_memory_entries")
       .insert({
         organization_id: organizationId,
@@ -99,7 +100,8 @@ export async function retrieveContext(organizationId: string, customerId: string
   // If we can't compute an embedding, return empty
   const queryEmbedding = await generateEmbedding(contextPrompt).catch(() => null);
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from("ai_memory_entries")
     .select("id, entry_kind, summary, importance, embedding")
     .eq("organization_id", organizationId)
@@ -189,7 +191,8 @@ export async function reflectAndConsolidate(organizationId: string, customerId: 
   };
 
   const fetchMemories = async () => {
-    const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
       .from("ai_memory_entries")
       .select("id, entry_kind, summary, importance, created_at")
       .eq("organization_id", organizationId)
@@ -216,7 +219,7 @@ export async function reflectAndConsolidate(organizationId: string, customerId: 
         .toLowerCase()
         .trim()
         .replace(/\s+/g, " ");
-      const groupKey = `${memory.entryKind}:${normalizedSummary}`;
+      const groupKey = `${memory.entry_kind}:${normalizedSummary}`;
       const group = groupedMemories.get(groupKey) ?? [];
       group.push(memory);
       groupedMemories.set(groupKey, group);
@@ -237,7 +240,8 @@ export async function reflectAndConsolidate(organizationId: string, customerId: 
       const mostImportant = Math.max(...group.map((memory) => Number(memory.importance ?? 50)));
       const embedding = await generateEmbedding(summary);
 
-      const { error: insertError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: insertError } = await (supabase as any)
         .from("ai_memory_entries")
         .insert({
           organization_id: organizationId,
@@ -255,7 +259,8 @@ export async function reflectAndConsolidate(organizationId: string, customerId: 
         throw new Error(`Failed to insert consolidated memory: ${insertError.message}`);
       }
 
-      const { error: deleteError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: deleteError } = await (supabase as any)
         .from("ai_memory_entries")
         .update({ deleted_at: new Date().toISOString() })
         .in("id", sourceMemoryIds);
@@ -312,7 +317,8 @@ export async function reflectAndConsolidate(organizationId: string, customerId: 
       if (insight.sourceMemoryIds.length > 1) {
         const embedding = await generateEmbedding(insight.summary);
 
-        const { error: insertError } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: insertError } = await (supabase as any)
           .from("ai_memory_entries")
           .insert({
             organization_id: organizationId,
@@ -330,7 +336,8 @@ export async function reflectAndConsolidate(organizationId: string, customerId: 
           throw new Error(`Failed to insert consolidated insight: ${insertError.message}`);
         }
 
-        const { error: deleteError } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: deleteError } = await (supabase as any)
           .from("ai_memory_entries")
           .update({ deleted_at: new Date().toISOString() })
           .in("id", insight.sourceMemoryIds);

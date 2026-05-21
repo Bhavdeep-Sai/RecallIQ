@@ -1,16 +1,20 @@
 "use client";
 
-import { Bell, Menu, Search, HelpCircle, LogOut, User, Settings2, Sparkles, ShieldAlert, MessageSquareText } from "lucide-react";
+import {
+  Bell, Menu, Search, HelpCircle, LogOut, User, Settings2,
+  Sparkles, ShieldAlert, MessageSquareText, Clock, Wallet, AlertTriangle, CheckCircle2,
+} from "lucide-react";
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { hasClerkPublishableKey } from "@/lib/auth-flags";
 import { useUiStore } from "@/store/ui-store";
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HoverTooltip } from "@/components/ui/hover-tooltip";
+import type { Notification, NotificationKind } from "@/app/api/notifications/route";
 
 const pageHelp: Record<string, { title: string; content: ReactNode }> = {
   "/": {
@@ -174,13 +178,82 @@ function DropdownLink({ href, icon, label, onClick }: { href: string; icon: Reac
   );
 }
 
+// ─── Notification helpers ────────────────────────────────────────────────────
+
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return "Now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h`;
+  return `${Math.floor(diffHr / 24)}d`;
+}
+
+function notificationIcon(kind: NotificationKind) {
+  switch (kind) {
+    case "escalation":   return <ShieldAlert className="h-4 w-4" style={{ color: "#f87171" }} />;
+    case "budget":       return <Wallet className="h-4 w-4" style={{ color: "#fb923c" }} />;
+    case "follow_up":    return <Clock className="h-4 w-4" style={{ color: "#facc15" }} />;
+    case "memory":       return <Sparkles className="h-4 w-4" style={{ color: "#22d3ee" }} />;
+    case "conversation": return <MessageSquareText className="h-4 w-4" style={{ color: "#4ade80" }} />;
+    default:             return <CheckCircle2 className="h-4 w-4" style={{ color: "var(--text-muted)" }} />;
+  }
+}
+
+function urgencyBorder(kind: NotificationKind): string {
+  switch (kind) {
+    case "escalation": return "#f87171";
+    case "budget":     return "#fb923c";
+    case "follow_up":  return "#facc15";
+    case "memory":     return "#22d3ee";
+    default:           return "var(--surface-overlay-border)";
+  }
+}
+
+// ─── Topbar ──────────────────────────────────────────────────────────────────
+
 export function Topbar() {
   const toggleMobileSidebar = useUiStore((state) => state.toggleMobileSidebar);
   const pathname = usePathname();
   const help = findHelpForPath(pathname);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
+  const fetchNotifications = useCallback(async () => {
+    setNotifLoading(true);
+    try {
+      const res = await fetch("/api/notifications");
+      if (res.ok) {
+        const json = await res.json();
+        const items: Notification[] = json.notifications ?? [];
+        setNotifications(items);
+        setUnreadCount((prev) => (notificationsOpen ? 0 : items.length));
+      }
+    } catch {
+      // non-critical — silently fail
+    } finally {
+      setNotifLoading(false);
+    }
+  }, [notificationsOpen]);
+
+  // Fetch on mount + every 60 s
+  useEffect(() => {
+    fetchNotifications();
+    const id = setInterval(fetchNotifications, 60_000);
+    return () => clearInterval(id);
+  }, [fetchNotifications]);
+
+  // Re-fetch when panel opens
+  useEffect(() => {
+    if (notificationsOpen) fetchNotifications();
+  }, [notificationsOpen, fetchNotifications]);
+
+  // Close on outside click
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
@@ -191,11 +264,10 @@ export function Topbar() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  const notifications = [
-    { icon: <Sparkles className="h-4 w-4 text-cyan-400" />, title: "Memory sync ready", text: "The latest conversation notes can be synchronized from this workspace.", time: "Now" },
-    { icon: <ShieldAlert className="h-4 w-4 text-amber-400" />, title: "Guardrails active", text: "Runtime policies are enforcing safe model routing and data handling.", time: "5m" },
-    { icon: <MessageSquareText className="h-4 w-4 text-emerald-400" />, title: "Conversation insight", text: "New follow-up suggestions are available in the conversations timeline.", time: "1h" },
-  ];
+  const handleOpen = () => {
+    setNotificationsOpen((v) => !v);
+    setUnreadCount(0);
+  };
 
   return (
     <header className="topbar-bg sticky top-0 z-20">
@@ -237,39 +309,92 @@ export function Topbar() {
               className="h-9 w-9 relative"
               aria-label="Notifications"
               aria-expanded={notificationsOpen}
-              onClick={() => setNotificationsOpen((open) => !open)}
+              onClick={handleOpen}
             >
               <Bell className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
-              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-green-400" />
+              {unreadCount > 0 ? (
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                  style={{ background: "#f87171" }}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              ) : (
+                <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full" style={{ background: "var(--green-400)" }} />
+              )}
             </Button>
 
             {notificationsOpen && (
-              <div className="dropdown-bg absolute right-0 top-11 z-50 w-88 rounded-2xl p-3">
+              <div className="dropdown-bg absolute right-0 top-11 z-50 rounded-2xl p-3" style={{ width: "340px" }}>
+                {/* Header */}
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Notifications</p>
-                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Recent workspace updates</p>
+                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      {notifications.length > 0 ? `${notifications.length} recent update${notifications.length !== 1 ? "s" : ""}` : "All caught up"}
+                    </p>
                   </div>
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest" style={{ background: "var(--success-bg)", color: "var(--success-text)" }}>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest"
+                    style={{ background: "var(--success-bg)", color: "var(--success-text)" }}>
                     Live
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  {notifications.map((item) => (
-                    <div key={item.title} className="rounded-xl border p-3" style={{ background: "var(--surface-overlay-bg)", borderColor: "var(--surface-overlay-border)" }}>
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5">{item.icon}</div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{item.title}</p>
-                            <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>{item.time}</span>
+                {/* Body */}
+                <div className="space-y-2" style={{ maxHeight: "420px", overflowY: "auto" }}>
+                  {notifLoading && notifications.length === 0 ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="rounded-xl border p-3 animate-pulse"
+                        style={{ background: "var(--surface-overlay-bg)", borderColor: "var(--surface-overlay-border)" }}>
+                        <div className="flex gap-3">
+                          <div className="h-4 w-4 rounded-full mt-0.5 shrink-0" style={{ background: "var(--border-default)" }} />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3 rounded w-3/4" style={{ background: "var(--border-default)" }} />
+                            <div className="h-2.5 rounded w-full" style={{ background: "var(--border-subtle)" }} />
                           </div>
-                          <p className="mt-1 text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{item.text}</p>
                         </div>
                       </div>
+                    ))
+                  ) : notifications.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 py-8">
+                      <AlertTriangle className="h-8 w-8" style={{ color: "var(--text-faint)" }} />
+                      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>No recent activity</p>
+                      <p className="text-xs text-center" style={{ color: "var(--text-faint)" }}>
+                        Notifications will appear as your workspace gets activity.
+                      </p>
                     </div>
-                  ))}
+                  ) : (
+                    notifications.map((item) => {
+                      const card = (
+                        <div
+                          className="rounded-xl border p-3 transition-opacity hover:opacity-90 cursor-pointer"
+                          style={{
+                            background: "var(--surface-overlay-bg)",
+                            borderColor: urgencyBorder(item.kind),
+                            borderLeftWidth: "3px",
+                          }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5 shrink-0">{notificationIcon(item.kind)}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.title}</p>
+                                <span className="text-[10px] uppercase tracking-widest shrink-0" style={{ color: "var(--text-faint)" }}>
+                                  {relativeTime(item.createdAt)}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs leading-relaxed line-clamp-2" style={{ color: "var(--text-secondary)" }}>{item.text}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                      return item.href ? (
+                        <Link key={item.id} href={item.href} onClick={() => setNotificationsOpen(false)}>
+                          {card}
+                        </Link>
+                      ) : (
+                        <div key={item.id}>{card}</div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}

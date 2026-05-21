@@ -19,7 +19,8 @@ export async function POST(req: Request) {
 
     if (!finalCustomerId) {
       const supabase = getSupabaseAdmin();
-      const { data: latestArr, error: latestError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: latestArr, error: latestError } = await (supabase as any)
         .from("conversations")
         .select("id, customer_id")
         .is("deleted_at", null)
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
         throw new Error(latestError.message);
       }
 
-      const latest = (latestArr ?? [])[0];
+      const latest = (latestArr as Array<{ id: string; customer_id: string }> ?? [])[0];
       if (latest) {
         finalCustomerId = latest.customer_id;
         finalConversationId = latest.id;
@@ -57,7 +58,8 @@ export async function POST(req: Request) {
     const supabase = getSupabaseAdmin();
 
     // Load customer + conversation
-    const { data: customerRows, error: customerError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: customerRows, error: customerError } = await (supabase as any)
       .from("customers")
       .select("*")
       .eq("id", finalCustomerId)
@@ -68,14 +70,15 @@ export async function POST(req: Request) {
       throw new Error(customerError.message);
     }
 
-    const customerRow = (customerRows ?? [])[0];
+    const customerRow = (customerRows as Array<{ display_name: string | null; company_name: string | null }> ?? [])[0];
     if (!customerRow) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
     let conversationSummary = "No recent conversation available.";
     if (finalConversationId) {
-      const { data: convRows, error: convError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: convRows, error: convError } = await (supabase as any)
         .from("conversations")
         .select("summary")
         .eq("id", finalConversationId)
@@ -86,7 +89,7 @@ export async function POST(req: Request) {
         throw new Error(convError.message);
       }
 
-      const convRow = (convRows ?? [])[0];
+      const convRow = (convRows as Array<{ summary: string | null }> ?? [])[0];
       if (convRow?.summary) conversationSummary = convRow.summary;
     }
 
@@ -98,8 +101,8 @@ export async function POST(req: Request) {
     );
 
     const followUp = await generateFollowUpEmail(
-      customerRow.displayName,
-      customerRow.companyName,
+      customerRow.display_name ?? "Customer",
+      customerRow.company_name ?? "",
       conversationSummary,
       memoryContext,
       senderName,

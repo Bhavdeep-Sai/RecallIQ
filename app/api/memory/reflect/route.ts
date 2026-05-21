@@ -16,7 +16,8 @@ export async function POST(req: Request) {
 
     if (!finalOrgId || !finalCustomerId) {
       const supabase = getSupabaseAdmin();
-      const { data: latestRows, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: latestRows, error } = await (supabase as any)
         .from("ai_memory_entries")
         .select("organization_id, customer_id")
         .is("deleted_at", null)

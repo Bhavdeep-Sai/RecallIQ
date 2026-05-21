@@ -1,8 +1,23 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/db/client";
-import { conversations, customers, messages } from "@/lib/db/schema";
-import { and, desc, eq, isNull } from "drizzle-orm";
 import { analyzeConversation } from "@/lib/services/sales-ai";
+
+type ConversationRow = {
+  id: string;
+  customer_id: string;
+  organization_id: string;
+  summary: string | null;
+};
+
+type CustomerRow = {
+  display_name: string | null;
+};
+
+type MessageRow = {
+  sender_type: string;
+  content: string;
+  occurred_at: string;
+};
 
 export async function POST(
   req: Request,
@@ -30,7 +45,8 @@ export async function POST(
     const supabase = getSupabaseAdmin();
 
     // Load conversation
-    const { data: convRows, error: convError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: convRows, error: convError } = await (supabase as any)
       .from("conversations")
       .select("*")
       .eq("id", id)
@@ -38,10 +54,11 @@ export async function POST(
       .limit(1);
 
     if (convError) throw new Error(convError.message);
-    const convRow = (convRows ?? [])[0];
+    const convRow = ((convRows ?? []) as ConversationRow[])[0];
     if (!convRow) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
 
-    const { data: customerRows, error: customerError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: customerRows, error: customerError } = await (supabase as any)
       .from("customers")
       .select("*")
       .eq("id", convRow.customer_id)
@@ -49,9 +66,10 @@ export async function POST(
       .limit(1);
     if (customerError) throw new Error(customerError.message);
 
-    const customerRow = (customerRows ?? [])[0];
+    const customerRow = ((customerRows ?? []) as CustomerRow[])[0];
 
-    const { data: messageRows, error: messagesError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: messageRows, error: messagesError } = await (supabase as any)
       .from("messages")
       .select("sender_type, content, occurred_at")
       .eq("conversation_id", id)
@@ -61,17 +79,17 @@ export async function POST(
 
     if (messagesError) throw new Error(messagesError.message);
 
-    const conversationText = (messageRows ?? [])
+    const conversationText = ((messageRows ?? []) as MessageRow[])
       .reverse()
-      .map((m: any) => `[${(m.sender_type ?? m.senderType)?.toString().toUpperCase()}]: ${m.content}`)
+      .map((m) => `[${m.sender_type.toUpperCase()}]: ${m.content}`)
       .join("\n");
 
     const analysis = await analyzeConversation(
       organizationId,
-      convRow.customerId,
+      convRow.customer_id,
       id,
       conversationText || convRow.summary || "No conversation content available.",
-      customerRow?.displayName ?? "Customer",
+      customerRow?.display_name ?? "Customer",
     );
 
     return NextResponse.json(analysis);

@@ -575,7 +575,8 @@ export async function saveFollowUp(
   try {
     const supabase = getSupabaseAdmin();
 
-    const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
       .from("ai_follow_ups")
       .insert({
         organization_id: organizationId,
@@ -617,7 +618,10 @@ export async function loadCustomerIntelligenceData(
   try {
     const supabase = getSupabaseAdmin();
 
-    const p1 = supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    const p1 = sb
       .from("customers")
       .select("*")
       .eq("id", customerId)
@@ -625,7 +629,7 @@ export async function loadCustomerIntelligenceData(
       .is("deleted_at", null)
       .limit(1);
 
-    const p2 = supabase
+    const p2 = sb
       .from("ai_memory_entries")
       .select("*")
       .eq("customer_id", customerId)
@@ -634,7 +638,7 @@ export async function loadCustomerIntelligenceData(
       .order("importance", { ascending: false })
       .limit(20);
 
-    const p3 = supabase
+    const p3 = sb
       .from("conversations")
       .select("*")
       .eq("customer_id", customerId)
@@ -643,7 +647,7 @@ export async function loadCustomerIntelligenceData(
       .order("started_at", { ascending: false })
       .limit(10);
 
-    const p4 = supabase
+    const p4 = sb
       .from("ai_follow_ups")
       .select("*")
       .eq("customer_id", customerId)

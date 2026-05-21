@@ -149,7 +149,8 @@ export async function POST() {
     const syncedAt = toISOString(new Date());
 
     for (const organization of orgRows) {
-      const { error: updateError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: updateError } = await (supabase as any)
         .from("organizations")
         .update({ metadata: mergeMetadata(organization.metadata, syncedAt) })
         .eq("id", organization.id);

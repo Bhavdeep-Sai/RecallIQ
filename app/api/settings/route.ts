@@ -17,7 +17,8 @@ type OrganizationRow = {
 
 async function getWorkspace() {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from("organizations")
     .select("id, name, timezone, metadata")
     .is("deleted_at", null)
@@ -85,7 +86,8 @@ export async function PUT(request: Request) {
       support_inbox: supportInbox,
     };
 
-    const { error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
       .from("organizations")
       .update({
         name: workspaceName,

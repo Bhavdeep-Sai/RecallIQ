@@ -25,12 +25,14 @@ export async function getDashboardMetrics() {
   try {
     const supabase = getSupabaseAdmin();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
     const [{ count: custCount }, { count: convCount }, { data: costData }, { data: latData }] =
       await Promise.all([
-        supabase.from("customers").select("*", { count: "exact", head: true }).is("deleted_at", null),
-        supabase.from("conversations").select("*", { count: "exact", head: true }).is("deleted_at", null),
-        supabase.from("token_usage_logs").select("cost_cents").is("deleted_at", null),
-        supabase.from("token_usage_logs").select("request_latency_ms").is("deleted_at", null),
+        sb.from("customers").select("*", { count: "exact", head: true }).is("deleted_at", null),
+        sb.from("conversations").select("*", { count: "exact", head: true }).is("deleted_at", null),
+        sb.from("token_usage_logs").select("cost_cents").is("deleted_at", null),
+        sb.from("token_usage_logs").select("request_latency_ms").is("deleted_at", null),
       ]);
 
     const totalCostCents = (costData ?? []).reduce((s: number, r: any) => s + (r.cost_cents ?? 0), 0);
@@ -64,7 +66,8 @@ export async function getAnalyticsSeries() {
     const supabase = getSupabaseAdmin();
     const sevenDaysAgo = new Date(Date.now() - 6 * 86400000).toISOString();
 
-    const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
       .from("conversations")
       .select("created_at")
       .is("deleted_at", null)
@@ -100,9 +103,11 @@ export async function getBudgetSummary() {
     const supabase = getSupabaseAdmin();
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
     const [{ data: spendData }, { data: limitData }] = await Promise.all([
-      supabase.from("token_usage_logs").select("cost_cents").is("deleted_at", null).gte("created_at", monthStart),
-      supabase.from("budget_limits").select("hard_limit_cents").is("deleted_at", null).eq("active", true),
+      sb.from("token_usage_logs").select("cost_cents").is("deleted_at", null).gte("created_at", monthStart),
+      sb.from("budget_limits").select("hard_limit_cents").is("deleted_at", null).eq("active", true),
     ]);
 
     const spendCents = (spendData ?? []).reduce((s: number, r: any) => s + (r.cost_cents ?? 0), 0);
